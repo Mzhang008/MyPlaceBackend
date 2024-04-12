@@ -1,18 +1,13 @@
 const axios = require("axios");
 const HttpError = require("../models/http-error");
-
-const API_KEY = "AIzaSyA5KlnibafD8OZzTb8PWS7NGaYU60vJ7Jc";
+require('dotenv').config();
 
 async function getCoordsForAddress(address) {
   const response = await axios.get(
     `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
       address
-    )}&key=${API_KEY}`
+    )}&key=${process.env.GMaps}`
   );
-  // return {
-  //     lat: 40.784405,
-  //     lng: -73.9878584,
-  // }
 
   const data = response.data;
   if (!data || data.status === "ZERO_RESULTS") {
