@@ -1,64 +1,81 @@
 const HttpError = require("../models/http-error");
-const { v4: uuid } = require("uuid");
+
 const { validationResult } = require("express-validator");
+const UserModel = require("../models/user");
 
-const DUMMY_USERS = [
-  {
-    id: "u1",
-    name: "Max",
-    email: "test@test.com",
-    password: "test",
-  },
-  {
-    id: "u2",
-    name: "Max2",
-    email: "test2@test.com",
-    password: "test2",
-  },
-];
+const getUsers = async (req, res, next) => {
+  let users;
+  try {
+    users = await UserModel.find({}, "-password");
+  } catch (err) {
+    const error = new HttpError(
+      "Something went wrong, could not fetch users",
+      500
+    );
+    return next(error);
+  }
+  if (!users || users.length === 0) {
+    return next(new HttpError("Could not find any users", 404));
+  }
 
-const getUsers = (req, res, next) => {
-  res.json({ users: DUMMY_USERS });
+  res.json({ users: users.map((user) => user.toObject({ getters: true })) });
 };
 
-const signUp = (req, res, next) => {
+const signUp = async (req, res, next) => {
   const validation = validationResult(req);
   if (!validation.isEmpty()) {
-    console.log(validation);
-    throw new HttpError("Invalid inputs passed, please check data", 422);
+    return next(new HttpError("Invalid inputs passed, please check data", 422));
   }
   const { name, email, password } = req.body;
-  const hasUser = DUMMY_USERS.find((u) => u.email === email);
-  if (hasUser) {
-    throw new HttpError("User already exists", 422);
+  let hasUser;
+  try {
+    hasUser = await UserModel.findOne({ email: email });
+  } catch (err) {
+    return next(new HttpError("Sign up failed, please try again."), 500);
   }
-  const newUser = {
-    id: uuid(),
+  if (hasUser) {
+    return next(new HttpError("User already exists", 422));
+  }
+  
+  //TODO image
+  const newUser = new UserModel({
     name,
     email,
     password,
-  };
-  DUMMY_USERS.push(newUser);
-  console.log(DUMMY_USERS);
+    image: "https://cdn.theatlantic.com/media/mt/science/cat_caviar.jpg",
+    places: [],
+  });
+
+  try {
+    await newUser.save();
+  } catch (err) {
+    const error = new HttpError("Sign up failed, please try again", 500);
+    return next(error);
+  }
+
   res.status(201).json({ user: newUser }); //201: create new data
 };
 
-const login = (req, res, next) => {
+const login = async (req, res, next) => {
   const validation = validationResult(req);
   if (!validation.isEmpty()) {
-    console.log(validation);
-    throw new HttpError("Invalid inputs passed, please check data", 422);
+    return next(new HttpError("Invalid inputs passed, please check data", 422));
   }
-
   const { email, password } = req.body;
-
-  const identifiedUser = DUMMY_USERS.find((user) => {
-    return user.email === email;
-  });
-  if (!identifiedUser || identifiedUser.password !== password) {
-    throw new HttpError("No user with matching email or password found", 404);
+  let hasUser;
+  try {
+    hasUser = await UserModel.findOne({ email: email });
+  } catch (err) {
+    return next(new HttpError("Login failed, please try again."), 500);
   }
-
+  if (!hasUser || hasUser.password !== password || hasUser.email !== email) {
+    return next(
+      new HttpError(
+        "No user with matching email or password found, please try again."
+      ),
+      500
+    );
+  }
   res.json({ message: "Logged in" });
 };
 
