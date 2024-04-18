@@ -36,7 +36,7 @@ const signUp = async (req, res, next) => {
   if (hasUser) {
     return next(new HttpError("User already exists", 422));
   }
-  
+
   //TODO image
   const newUser = new UserModel({
     name,
@@ -53,7 +53,7 @@ const signUp = async (req, res, next) => {
     return next(error);
   }
 
-  res.status(201).json({ user: newUser }); //201: create new data
+  res.status(201).json({ user: newUser.toObject({ getters: true }) }); //201: create new data
 };
 
 const login = async (req, res, next) => {
@@ -66,17 +66,17 @@ const login = async (req, res, next) => {
   try {
     hasUser = await UserModel.findOne({ email: email });
   } catch (err) {
-    return next(new HttpError("Login failed, please try again."), 500);
+    return next(new HttpError("Login failed, please try again.", 500));
   }
   if (!hasUser || hasUser.password !== password || hasUser.email !== email) {
     return next(
       new HttpError(
-        "No user with matching email or password found, please try again."
-      ),
-      500
+        "No user with matching email or password found, please try again.",
+        401
+      )
     );
   }
-  res.json({ message: "Logged in" });
+  res.json({ message: "Logged in", user: hasUser.toObject({ getters: true }) });
 };
 
 exports.getUsers = getUsers;

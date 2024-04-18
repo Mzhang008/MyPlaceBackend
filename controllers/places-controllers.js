@@ -39,7 +39,7 @@ const getPlacesbyUserId = async (req, res, next) => {
     return next(error);
   }
 
-  if (!userWithPlaces.places || userWithPlaces.places.length === 0) {
+  if (userWithPlaces.places === null || !userWithPlaces.places || userWithPlaces.places.length === 0) {
     return next(
       new HttpError(
         "Could not find any places matching the provided user ID",
@@ -58,7 +58,6 @@ const createPlace = async (req, res, next) => {
   if (!validation.isEmpty()) {
     next(new HttpError("Invalid inputs passed, please check data", 422));
   }
-
   const { title, description, address, creator } = req.body;
   // Use Google maps
   let coordinates;
@@ -114,7 +113,6 @@ const createPlace = async (req, res, next) => {
 const updatePlace = async (req, res, next) => {
   const placeId = req.params.pid;
   const validation = validationResult(req);
-
   if (!validation.isEmpty()) {
     return next(new HttpError("Invalid inputs passed, please check data", 422));
   }
