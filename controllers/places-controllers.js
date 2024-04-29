@@ -4,6 +4,7 @@ const { validationResult } = require("express-validator");
 const getCoordsForAddress = require("../util/location");
 const PlaceModel = require("../models/place");
 const UserModel = require("../models/user");
+const fs = require("fs");
 
 const getPlacebyId = async (req, res, next) => {
   const placeId = req.params.pid; // params allows access to url parameter { :## : '##' }
@@ -33,13 +34,20 @@ const getPlacesbyUserId = async (req, res, next) => {
   const userId = req.params.uid; // params allows access to url parameter { :## : '##' }
   let userWithPlaces;
   try {
-    userWithPlaces = await UserModel.findById(userId).populate('places');
+    userWithPlaces = await UserModel.findById(userId).populate("places");
   } catch (err) {
-    const error = new HttpError("Something went wrong fetching places, please try again", 500);
+    const error = new HttpError(
+      "Something went wrong fetching places, please try again",
+      500
+    );
     return next(error);
   }
 
-  if (userWithPlaces.places === null || !userWithPlaces.places || userWithPlaces.places.length === 0) {
+  if (
+    userWithPlaces.places === null ||
+    !userWithPlaces.places ||
+    userWithPlaces.places.length === 0
+  ) {
     return next(
       new HttpError(
         "Could not find any places matching the provided user ID",
@@ -49,7 +57,9 @@ const getPlacesbyUserId = async (req, res, next) => {
   }
 
   res.json({
-    places: userWithPlaces.places.map((place) => place.toObject({ getters: true })),
+    places: userWithPlaces.places.map((place) =>
+      place.toObject({ getters: true })
+    ),
   });
 };
 
@@ -66,13 +76,12 @@ const createPlace = async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
-  //TODO reaplce Placeholder image with file upload
+  //TODO replace Placeholder image with file upload
 
   const createdPlace = new PlaceModel({
     title,
     description,
-    image:
-      "https://upload.wikimedia.org/wikipedia/commons/0/02/Willis_Tower_From_Lake.jpg",
+    image: req.file.path,
     location: coordinates,
     address,
     creator,
@@ -150,7 +159,7 @@ const deletePlace = async (req, res, next) => {
 
   let place;
   try {
-    place = await PlaceModel.findById(placeId).populate('creator');
+    place = await PlaceModel.findById(placeId).populate("creator");
   } catch (err) {
     const error = new HttpError(
       "Something went wrong, could not find place",
@@ -166,6 +175,8 @@ const deletePlace = async (req, res, next) => {
     );
     return next(error);
   }
+  // can edit/remove this next line if image storage is desired regardless of deletion
+  const imagePath = place.image;
 
   try {
     const sess = await mongoose.startSession();
@@ -182,7 +193,10 @@ const deletePlace = async (req, res, next) => {
     console.log(err);
     return next(error);
   }
-
+  // can edit/remove this if image storage is desired regardless of deletion
+  fs.unlink(imagePath, (err) => {
+    console.log("Image delete error " + err);
+  });
   res.status(200).json({ message: "deleted place" });
 };
 

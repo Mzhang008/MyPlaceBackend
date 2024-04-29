@@ -36,13 +36,12 @@ const signUp = async (req, res, next) => {
   if (hasUser) {
     return next(new HttpError("User already exists", 422));
   }
-
-  //TODO image
+  console.log(req.file);
   const newUser = new UserModel({
     name,
     email,
     password,
-    image: "https://cdn.theatlantic.com/media/mt/science/cat_caviar.jpg",
+    image: req.file.path,
     places: [],
   });
 

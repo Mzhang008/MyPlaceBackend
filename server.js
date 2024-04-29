@@ -1,6 +1,8 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
+const fs = require("fs");
+const path = require("path");
 
 const placesRoutes = require("./routes/places-routes");
 const usersRoutes = require("./routes/users-routes");
@@ -10,7 +12,9 @@ const app = express();
 
 app.use(bodyParser.json());
 
-//following code accomplishes basically the same as npm-cors app.use(cors());
+app.use('/uploads/images', express.static(path.join('uploads','images')));
+
+//following code accomplishes basically the same as npm-cors pkg, app.use(cors());
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
@@ -24,10 +28,16 @@ app.use("/api/users", usersRoutes);
 
 app.use((req, res, next) => {
   const error = new HttpError("Could not find this route", 404);
-  next(error);
+  return next(error);
 });
 
+//error handler
 app.use((error, req, res, next) => {
+  if (req.file) {
+    fs.unlink(req.file.path, (err) => {
+      console.log(err);
+    }); //multer adds req.file path param
+  }
   if (res.headerSent) {
     return next(error);
   }
@@ -36,11 +46,11 @@ app.use((error, req, res, next) => {
     .json({ message: error.message || "An unknown error has occurred" });
 });
 
-//app.use() triggers on all requests
-app.use("/", (req, res, next) => {
-  res.setHeader("Content-Type", "text/html");
-  res.end(`<a href="/api/places/">Test</a>`);
-});
+// app.use("/", (req, res, next) => {
+//   res.setHeader("Content-Type", "text/html");
+//   res.end(`<a href="/api/places/">Test</a>`);
+// });
+
 //establish connection to database first, then backend server
 mongoose
     .connect("mongodb+srv://test:test123@cluster0.jkcknh2.mongodb.net/places?retryWrites=true&w=majority&appName=Cluster0")
