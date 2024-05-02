@@ -68,7 +68,7 @@ const createPlace = async (req, res, next) => {
   if (!validation.isEmpty()) {
     next(new HttpError("Invalid inputs passed, please check data", 422));
   }
-  const { title, description, address, creator } = req.body;
+  const { title, description, address } = req.body;
   // Use Google maps
   let coordinates;
   try {
@@ -84,14 +84,14 @@ const createPlace = async (req, res, next) => {
     image: req.file.path,
     location: coordinates,
     address,
-    creator,
+    creator: req.userData.userId,
   });
 
   //verify user is in database
 
   let user;
   try {
-    user = await UserModel.findById(creator);
+    user = await UserModel.findById(req.userData.userId);
   } catch (err) {
     console.log(err);
     return next(new HttpError("Creating place failed, please try again", 500));
@@ -140,6 +140,13 @@ const updatePlace = async (req, res, next) => {
       new HttpError("Could not find a place matching the provided ID", 404)
     );
   }
+
+  if (place.creator.toString() !== req.userData.userId) {
+    return next(
+      new HttpError("Not authorized to edit this place", 401)
+    );
+  }
+
   const { title, description } = req.body;
   place.title = title;
   place.description = description;
@@ -175,6 +182,14 @@ const deletePlace = async (req, res, next) => {
     );
     return next(error);
   }
+
+  if (place.creator.id !== req.userData.userId) {
+    return next(
+      new HttpError("Not authorized to edit this place", 401)
+    );
+  }
+  
+
   // can edit/remove this next line if image storage is desired regardless of deletion
   const imagePath = place.image;
 
@@ -195,7 +210,9 @@ const deletePlace = async (req, res, next) => {
   }
   // can edit/remove this if image storage is desired regardless of deletion
   fs.unlink(imagePath, (err) => {
+    if (err) {
     console.log("Image delete error " + err);
+    };
   });
   res.status(200).json({ message: "deleted place" });
 };

@@ -3,8 +3,12 @@ const { check } = require("express-validator");
 const placesControllers = require("../controllers/places-controllers");
 const fileUpload = require("../middleware/file-upload");
 const router = express.Router();
+const checkAuth = require("../middleware/check-auth");
 
 router.get("/:pid", placesControllers.getPlacebyId);
+router.get("/user/:uid", placesControllers.getPlacesbyUserId);
+
+router.use(checkAuth);
 
 router.patch(
   "/:pid",
@@ -13,8 +17,6 @@ router.patch(
 ); //
 
 router.delete("/:pid", placesControllers.deletePlace); //
-
-router.get("/user/:uid", placesControllers.getPlacesbyUserId);
 
 router.post(
   "/",

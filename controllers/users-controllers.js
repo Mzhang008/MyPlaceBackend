@@ -1,12 +1,14 @@
 const HttpError = require("../models/http-error");
-
+const bcrypt = require("bcryptjs");
 const { validationResult } = require("express-validator");
 const UserModel = require("../models/user");
+const jsonWebToken = require("jsonwebtoken");
+require("dotenv").config();
 
 const getUsers = async (req, res, next) => {
   let users;
   try {
-    users = await UserModel.find({}, "-password");
+    users = await UserModel.find({}, "-password"); // exclude password in sent data
   } catch (err) {
     const error = new HttpError(
       "Something went wrong, could not fetch users",
@@ -36,11 +38,18 @@ const signUp = async (req, res, next) => {
   if (hasUser) {
     return next(new HttpError("User already exists", 422));
   }
-  console.log(req.file);
+
+  let hashedPassword;
+  try {
+    hashedPassword = await bcrypt.hash(password, 12);
+  } catch (err) {
+    return next(new HttpError("Could not create user, please try again.", 500));
+  }
+
   const newUser = new UserModel({
     name,
     email,
-    password,
+    password: hashedPassword,
     image: req.file.path,
     places: [],
   });
@@ -51,8 +60,19 @@ const signUp = async (req, res, next) => {
     const error = new HttpError("Sign up failed, please try again", 500);
     return next(error);
   }
+  let token;
+  try {
+    token = jsonWebToken.sign(
+      { userId: newUser.id, email: newUser.email },
+      //process.env.enc,
+      'secret_house_15243',
+      { expiresIn: "1h" }
+    );
+  } catch (err) {
+    return next(new HttpError("Login failed, please try again", 500));
+  }
 
-  res.status(201).json({ user: newUser.toObject({ getters: true }) }); //201: create new data
+  res.status(201).json({ userId: newUser.id, email: newUser.email, token: token}); //201: create new data
 };
 
 const login = async (req, res, next) => {
@@ -67,7 +87,7 @@ const login = async (req, res, next) => {
   } catch (err) {
     return next(new HttpError("Login failed, please try again.", 500));
   }
-  if (!hasUser || hasUser.password !== password || hasUser.email !== email) {
+  if (!hasUser) {
     return next(
       new HttpError(
         "No user with matching email or password found, please try again.",
@@ -75,7 +95,34 @@ const login = async (req, res, next) => {
       )
     );
   }
-  res.json({ message: "Logged in", user: hasUser.toObject({ getters: true }) });
+  let isValidPassword = false;
+  try {
+    isValidPassword = await bcrypt.compare(password, hasUser.password);
+  } catch (err) {
+    return next(new HttpError("Could not login, please try again.", 500));
+  }
+  if (!isValidPassword) {
+    return next(
+      new HttpError(
+        "No user with matching email or password found, please try again.",
+        401
+      )
+    );
+  }
+
+  let token;
+  try {
+    token = jsonWebToken.sign(
+      { userId: hasUser.id, email: hasUser.email },
+      //process.env.enc,
+      'secret_house_15243',
+      { expiresIn: "1h" }
+    );
+  } catch (err) {
+    return next(new HttpError("Login failed, please try again", 500));
+  }
+
+  res.json({ userId: hasUser.id, email: hasUser.email, token: token });
 };
 
 exports.getUsers = getUsers;
