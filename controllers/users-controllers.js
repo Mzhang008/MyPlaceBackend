@@ -4,6 +4,7 @@ const { validationResult } = require("express-validator");
 const UserModel = require("../models/user");
 const jsonWebToken = require("jsonwebtoken");
 require("dotenv").config();
+console.log(process.env.encKey)
 
 const getUsers = async (req, res, next) => {
   let users;
@@ -64,8 +65,7 @@ const signUp = async (req, res, next) => {
   try {
     token = jsonWebToken.sign(
       { userId: newUser.id, email: newUser.email },
-      //process.env.enc,
-      'secret_house_15243',
+      process.env.encKey,
       { expiresIn: "1h" }
     );
   } catch (err) {
@@ -114,8 +114,7 @@ const login = async (req, res, next) => {
   try {
     token = jsonWebToken.sign(
       { userId: hasUser.id, email: hasUser.email },
-      //process.env.enc,
-      'secret_house_15243',
+      process.env.encKey,
       { expiresIn: "1h" }
     );
   } catch (err) {

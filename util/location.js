@@ -6,7 +6,6 @@ async function getCoordsForAddress(address) {
   const response = await axios.get(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${process.env.GMaps}`);
 
   const data = response.data;
-  console.log(data);
   if (!data || data.status === "ZERO_RESULTS") {
     const error = new HttpError(
       "Could not find location for specified address",

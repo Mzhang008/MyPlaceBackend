@@ -3,6 +3,7 @@ const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
+require('dotenv').config();
 
 const placesRoutes = require("./routes/places-routes");
 const usersRoutes = require("./routes/users-routes");
@@ -35,7 +36,6 @@ app.use((req, res, next) => {
 app.use((error, req, res, next) => {
   if (req.file) {
     fs.unlink(req.file.path, (err) => {
-      console.log(err);
     }); //multer adds req.file path param
   }
   if (res.headerSent) {
@@ -52,8 +52,9 @@ app.use((error, req, res, next) => {
 // });
 
 //establish connection to database first, then backend server
+
 mongoose
-    .connect("mongodb+srv://test:test123@cluster0.jkcknh2.mongodb.net/places?retryWrites=true&w=majority&appName=Cluster0")
+    .connect(`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.jkcknh2.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority&appName=Cluster0`)
     .then(() => {
         app.listen(5000);
         console.log("started");

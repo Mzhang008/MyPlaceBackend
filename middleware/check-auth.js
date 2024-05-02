@@ -13,7 +13,7 @@ module.exports = (req, res, next) => {
     if (!token) {
       return next(new HttpError("Authentication failed.", 401));
     }
-    const decodedToken = jsonWebToken.verify(token, 'secret_house_15243');
+    const decodedToken = jsonWebToken.verify(token, process.env.encKey);
     req.userData = { userId: decodedToken.userId };
     next();
   } catch (err) {
