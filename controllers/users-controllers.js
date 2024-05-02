@@ -4,7 +4,6 @@ const { validationResult } = require("express-validator");
 const UserModel = require("../models/user");
 const jsonWebToken = require("jsonwebtoken");
 require("dotenv").config();
-console.log(process.env.encKey)
 
 const getUsers = async (req, res, next) => {
   let users;
