@@ -18,6 +18,9 @@ router.patch(
 
 router.delete("/:pid", placesControllers.deletePlace); //
 
+
+// POST new place
+
 router.post(
   "/",
   fileUpload.single("image"),

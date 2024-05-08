@@ -4,7 +4,14 @@ const { validationResult } = require("express-validator");
 const getCoordsForAddress = require("../util/location");
 const PlaceModel = require("../models/place");
 const UserModel = require("../models/user");
-const fs = require("fs");
+// const fs = require("fs");
+const crypto = require("crypto");
+require("dotenv").config();
+
+
+const { s3, storeImageS3, getImageUrl, deleteImageS3 } = require("./s3-controllers");
+
+
 
 const getPlacebyId = async (req, res, next) => {
   const placeId = req.params.pid; // params allows access to url parameter { :## : '##' }
@@ -27,7 +34,15 @@ const getPlacebyId = async (req, res, next) => {
     );
     return next(error);
   }
-  res.json({ place: place.toObject({ getters: true }) });
+  const url = await getImageUrl(place.image);
+  // const getObjectParams = {
+  //   Bucket: bucketName,
+  //   Key: place.image,
+  // };
+  // const command = new GetObjectCommand(getObjectParams);
+  // const url = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+  res.json({ imageUrl: url, place: place.toObject({ getters: true }) });
 };
 
 const getPlacesbyUserId = async (req, res, next) => {
@@ -55,11 +70,22 @@ const getPlacesbyUserId = async (req, res, next) => {
       )
     );
   }
-
+  let placesResult = [];
+  for (const place of userWithPlaces.places) {
+    // const getObjectParams = {
+    //   Bucket: bucketName,
+    //   Key: place.image,
+    // }
+    let placeObj = place.toObject({ getters: true });
+    const url = await getImageUrl(placeObj.image);
+    placeObj.imageUrl = url;
+    placesResult.push(placeObj);
+  }
   res.json({
-    places: userWithPlaces.places.map((place) =>
-      place.toObject({ getters: true })
-    ),
+    places: placesResult,
+    // places: userWithPlaces.places.map((place) =>
+    //   place.toObject({ getters: true })
+    // ),
   });
 };
 
@@ -76,12 +102,13 @@ const createPlace = async (req, res, next) => {
   } catch (error) {
     return next(error);
   }
-  //TODO replace Placeholder image with file upload
+  const imageName = crypto.randomBytes(32).toString("hex");
 
   const createdPlace = new PlaceModel({
     title,
     description,
-    image: req.file.path,
+    // image: req.file.path,
+    image: imageName,
     location: coordinates,
     address,
     creator: req.userData.userId,
@@ -100,7 +127,14 @@ const createPlace = async (req, res, next) => {
     return next(new HttpError("Could not find user", 404));
   }
 
+  // store image file in s3 bucket
+  try {
+    await storeImageS3(req, res, next, imageName);
+  } catch (err) {
+    //
+  }
 
+  // store place in database
   try {
     const sess = await mongoose.startSession();
     sess.startTransaction();
@@ -140,9 +174,7 @@ const updatePlace = async (req, res, next) => {
   }
 
   if (place.creator.toString() !== req.userData.userId) {
-    return next(
-      new HttpError("Not authorized to edit this place", 401)
-    );
+    return next(new HttpError("Not authorized to edit this place", 401));
   }
 
   const { title, description } = req.body;
@@ -182,15 +214,25 @@ const deletePlace = async (req, res, next) => {
   }
 
   if (place.creator.id !== req.userData.userId) {
-    return next(
-      new HttpError("Not authorized to edit this place", 401)
-    );
+    return next(new HttpError("Not authorized to edit this place", 401));
   }
-  
 
   // can edit/remove this next line if image storage is desired regardless of deletion
-  const imagePath = place.image;
+  // const imagePath = place.image;
 
+  // const params = {
+  //   Bucket: bucketName,
+  //   Key: place.image,
+  // };
+  // const command = new DeleteObjectCommand(params);
+  try {
+    // await s3.send(command);
+    await deleteImageS3(place.image);
+    console.log("deleted");
+  } catch (err) {
+    console.log(err);
+    return next(err);
+  }
   try {
     const sess = await mongoose.startSession();
     sess.startTransaction();
@@ -207,11 +249,11 @@ const deletePlace = async (req, res, next) => {
     return next(error);
   }
   // can edit/remove this if image storage is desired regardless of deletion
-  fs.unlink(imagePath, (err) => {
-    if (err) {
-    console.log("Image delete error " + err);
-    };
-  });
+  // fs.unlink(imagePath, (err) => {
+  //   if (err) {
+  //     console.log("Image delete error " + err);
+  //   }
+  // });
   res.status(200).json({ message: "deleted place" });
 };
 
@@ -220,3 +262,4 @@ exports.updatePlace = updatePlace;
 exports.createPlace = createPlace;
 exports.getPlacebyId = getPlacebyId;
 exports.getPlacesbyUserId = getPlacesbyUserId;
+exports.storeImageS3 = storeImageS3;

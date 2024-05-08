@@ -3,7 +3,10 @@ const bcrypt = require("bcryptjs");
 const { validationResult } = require("express-validator");
 const UserModel = require("../models/user");
 const jsonWebToken = require("jsonwebtoken");
+const crypto = require("crypto");
 require("dotenv").config();
+
+const { s3, storeImageS3, getImageUrl } = require("./s3-controllers");
 
 const getUsers = async (req, res, next) => {
   let users;
@@ -19,8 +22,16 @@ const getUsers = async (req, res, next) => {
   if (!users || users.length === 0) {
     return next(new HttpError("Could not find any users", 404));
   }
+  //add s3 signed url
+  let usersResult = [];
+  for (const user of users) {
+    let userObj = user.toObject({ getters: true });
+    const url = await getImageUrl(user.image);
+    userObj.imageUrl = url;
+    usersResult.push(userObj);
+  }
 
-  res.json({ users: users.map((user) => user.toObject({ getters: true })) });
+  res.json({ users: usersResult });
 };
 
 const signUp = async (req, res, next) => {
@@ -46,18 +57,37 @@ const signUp = async (req, res, next) => {
     return next(new HttpError("Could not create user, please try again.", 500));
   }
 
+  const imageName = crypto.randomBytes(32).toString("hex");
+
   const newUser = new UserModel({
     name,
     email,
     password: hashedPassword,
-    image: req.file.path,
+    image: imageName,
     places: [],
   });
 
+  console.log(newUser.image);
   try {
-    await newUser.save();
+    await storeImageS3(req, res, next, imageName);
   } catch (err) {
-    const error = new HttpError("Sign up failed, please try again", 500);
+    console.log(err);
+    return next(new HttpError("S3 upload failed", 500));
+  }
+  try {
+    // const sess = await mongoose.startSession();
+    // console.log('start 1')
+    // sess.startTransaction();
+    // console.log('start 2')
+    await newUser.save();
+    // console.log('start 3')
+    // await sess.commitTransaction();
+    // console.log('start 4')
+  } catch (err) {
+    const error = new HttpError(
+      "Saving new user failed, please try again",
+      500
+    );
     return next(error);
   }
   let token;
@@ -71,7 +101,9 @@ const signUp = async (req, res, next) => {
     return next(new HttpError("Login failed, please try again", 500));
   }
 
-  res.status(201).json({ userId: newUser.id, email: newUser.email, token: token}); //201: create new data
+  res
+    .status(201)
+    .json({ userId: newUser.id, email: newUser.email, token: token }); //201: create new data
 };
 
 const login = async (req, res, next) => {
